@@ -4,6 +4,9 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.Statement;
 import javax.swing.JFrame;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
@@ -128,16 +131,49 @@ public class EMPLACAMENTO extends JDialog
          String Plc = PLACA.limpaPlaca( txtPlaca.getText() );
          byte[] plc = Plc.getBytes();
          plc[4] += 17;
-         String P = new String( plc );
+         String placa = new String( plc );
+         emplacamento = DATA.reverteDATA( emplacamento );
+
+         final String Url      = "jdbc:mysql://127.0.0.1:3306/detran";
+         final String User     = "root";
+         final String PassWord = "mysql";
+
+         Connection Conexão = null;
+         Statement  Comando = null;
+         String Sql = "UPDATE veiculo SET DTemplacamento = '" + emplacamento + "' WHERE Placa = '" + placa + "';";
+
+         try {
+            Conexão = DriverManager.getConnection( Url , User , PassWord );
+            Comando = Conexão.createStatement();
+            if ( Comando.executeUpdate( Sql ) != 1 ) {
+               JOptionPane.showMessageDialog( EMPLACAMENTO.this ,
+                       "Número inválido de registros alterados!" ,
+                       "Erro de Banco de Dados" , JOptionPane.ERROR_MESSAGE );
+               return;
+            }
+
+         } catch( Exception erro ) {
+            JOptionPane.showMessageDialog( EMPLACAMENTO.this ,
+                    erro , "Erro de Banco de Dados" ,
+                    JOptionPane.ERROR_MESSAGE );
+            return;
+
+         } finally {
+            try {
+               if( Comando != null ) Comando.close();
+               if( Conexão != null ) Conexão.close();
+
+            } catch( Exception erro ) {
+               JOptionPane.showMessageDialog( EMPLACAMENTO.this ,
+                       erro , "Erro de Banco de Dados" ,
+                       JOptionPane.ERROR_MESSAGE );
+               return;
+            }
+         }
 
          BotãoSalvar = true;
-         PlcRetorno  = P;
-         DTretorno   = emplacamento;
-//-------------------------------------------------------------
-//       Atualizar o Banco de Dados: UPDATE emplacamento
-         JOptionPane.showMessageDialog( EMPLACAMENTO.this , "Emplacando Veículo..." ,
-                 "Rotina de Emplacamento" , JOptionPane.INFORMATION_MESSAGE );
-//-------------------------------------------------------------
+         PlcRetorno  = placa;
+         DTretorno   = DATA.inverteDATA( emplacamento );
          dispose();
       }
    }

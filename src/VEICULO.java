@@ -8,8 +8,11 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JTextField;
 import javax.swing.JOptionPane;
-import javax.swing.SwingConstants;
 import javax.swing.JButton;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
 
 public class VEICULO extends JFrame
 {
@@ -42,8 +45,8 @@ public class VEICULO extends JFrame
    private final JButton btnEmplacar;
    private final JButton btnTransferir;
 
-   static protected String  placaAnterior = "@@@@@@@";
-   static protected boolean placaNova     = false;
+   boolean veiculoNovo = true;
+   boolean botãoSalvar = false;
 
    public VEICULO()
    {
@@ -159,6 +162,7 @@ public class VEICULO extends JFrame
       {
          if ( validaPlaca( PLACA.limpaPlaca( txtPlaca.getText() ) ) )
             txtEmplacamento.requestFocus();
+         botãoSalvar = false;
       }
    }
    private class HdlrPlacaFc implements FocusListener
@@ -167,48 +171,102 @@ public class VEICULO extends JFrame
       public void focusGained( FocusEvent event )
       {
          txtPlaca.setText( PLACA.limpaPlaca( txtPlaca.getText() ) );
+         botãoSalvar = false;
       }
       @Override
       public void focusLost( FocusEvent event )
       {
 //         if ( validaPlaca( PLACA.limpaPlaca( txtPlaca.getText() ) ) )
 //            txtEmplacamento.requestFocus();
+//         botãoSalvar = false;
       }
    }
    private boolean validaPlaca( String placa )
    {
       if ( placa.length() == 0 ) {
-         JOptionPane.showMessageDialog( VEICULO.this , "Informe a Placa!" ,
-                 "Formato AAA9X99" , JOptionPane.WARNING_MESSAGE );
+         JOptionPane.showMessageDialog( VEICULO.this ,
+                 "Informe a Placa!" , "Formato AAA9X99" ,
+                 JOptionPane.WARNING_MESSAGE );
          txtPlaca.requestFocus();
          return false;
       }
       if ( !PLACA.PLACAéValida( placa ) ) {
          txtProprietario.setEditable(  true );
          txtProprietario.setFocusable( true );
-         btnSalvar.setVisible(     false );
-         btnExcluir.setVisible(    false );
-         btnTransferir.setVisible( false );
-         btnEmplacar.setVisible(   false );
-         placaAnterior = "@@@@@@@";
-         placaNova     = false;
-         JOptionPane.showMessageDialog( VEICULO.this , "Placa inválida!" ,
-                 "Formato AAA9X99" , JOptionPane.ERROR_MESSAGE );
+         btnSalvar.setVisible(         false );
+         btnExcluir.setVisible(        false );
+         btnTransferir.setVisible(     false );
+         btnEmplacar.setVisible(       false );
+         JOptionPane.showMessageDialog( VEICULO.this ,
+                 "Placa inválida!" , "Formato AAA9X99" ,
+                 JOptionPane.ERROR_MESSAGE );
          txtPlaca.requestFocus();
          return false;
       }
+      if ( botãoSalvar ) return true;
       placa = placa.toUpperCase();
       PLACA Placa = new PLACA( placa );
+      String Mercosul = Placa.getMercosul();
       txtPlaca.setText( Placa.toString() );
-//-------------------------------------------------------------
-//    Acessar Banco de Dados: SELECT PLACA = Placa
-//      String VeiculoExiste = JOptionPane.showInputDialog("Veículo já existe?");
-      String VeiculoExiste = "sim";
 
-      if ( VeiculoExiste.equals( "sim" ) ) {
+      final String Url      = "jdbc:mysql://127.0.0.1:3306/detran";
+      final String User     = "root";
+      final String PassWord = "mysql";
 
+      Connection Conexão = null;
+      Statement  Comando = null;
+      byte qtdVeiculos = 0;
+
+      try {
+         Conexão = DriverManager.getConnection( Url , User , PassWord );
+         Comando = Conexão.createStatement();
+
+         String Select = "SELECT * FROM veiculo WHERE Placa = '" + Mercosul + "'";
+         ResultSet Resultado = Comando.executeQuery( Select );
+
+         while( Resultado.next() ) {
+            qtdVeiculos++;
+            DTemplacamento = new DATA( DATA.inverteDATA(
+                             Resultado.getString( "DTemplacamento" ) ) );
+            Marca          = Resultado.getString( "Marca"          );
+            Modelo         = Resultado.getString( "Modelo"         );
+            Ano            = Resultado.getShort(  "Ano"            );
+            Cor            = Resultado.getString( "Cor"            );
+            long prop      = Resultado.getLong(   "Proprietario"   );
+            String proprietario = String.valueOf( prop );
+            Proprietario = new CPF( proprietario );
+         }
+      } catch( Exception erro ) {
+         JOptionPane.showMessageDialog( VEICULO.this ,
+                 erro , "Erro de Banco de Dados" ,
+                 JOptionPane.ERROR_MESSAGE );
+         txtPlaca.requestFocus();
+         return false;
+
+      } finally {
+         try {
+            if( Comando != null ) Comando.close();
+            if( Conexão != null ) Conexão.close();
+
+         } catch( Exception erro ) {
+            JOptionPane.showMessageDialog( VEICULO.this ,
+                    erro , "Erro de Banco de Dados" ,
+                    JOptionPane.ERROR_MESSAGE );
+            txtPlaca.requestFocus();
+            return false;
+         }
+      }
+      if ( qtdVeiculos > 1 ) {
+         JOptionPane.showMessageDialog( VEICULO.this ,
+                 "Mais de um Veículo com a mesma Placa" ,
+                 "Erro de Banco de Dados" , JOptionPane.ERROR_MESSAGE );
+         txtPlaca.requestFocus();
+         return false;
+      }
+      if ( qtdVeiculos == 1 ) {
+
+         veiculoNovo = false;
          if ( Placa.getEhMercosul() ) {
-            DATA DTemplacamento = new DATA( "16/06/2025" );
             txtEmplacamento.setText( DTemplacamento.toString() );
             btnEmplacar.setVisible( false );
          }
@@ -216,45 +274,40 @@ public class VEICULO extends JFrame
             txtEmplacamento.setText( "" );
             btnEmplacar.setVisible( true );
          }
-
-         txtMarca.setText(  "MARCA DO VEÍCULO"  );
-         txtModelo.setText( "MODELO DO VEÍCULO" );
-         txtAno.setText(    "2020"              );
-         txtCor.setText(    "COR DO VEÍCULO"    );
-         CPF Proprietario = new CPF( "191" );
+         txtMarca.setText(        Marca                   );
+         txtModelo.setText(       Modelo                  );
+         txtAno.setText(          String.valueOf( Ano )   );
+         txtCor.setText(          Cor                     );
          txtProprietario.setText( Proprietario.toString() );
-//-------------------------------------------------------------
          txtEmplacamento.setEditable(  false );
          txtEmplacamento.setFocusable( false );
          txtProprietario.setEditable(  false );
          txtProprietario.setFocusable( false );
          btnExcluir.setVisible(        true  );
          btnTransferir.setVisible(     true  );
-         placaNova = false;
          txtMarca.requestFocus();
       }
       else {
+         veiculoNovo = true;
          if ( Placa.getEhMercosul() ) {
             txtEmplacamento.setEditable(  true );
             txtEmplacamento.setFocusable( true );
             txtEmplacamento.requestFocus();
+            btnEmplacar.setVisible( false );
          }
          else {
             txtEmplacamento.setText( "" );
             txtEmplacamento.setEditable(  false );
             txtEmplacamento.setFocusable( false );
             txtMarca.requestFocus();
+            btnEmplacar.setVisible( true );
          }
-
          txtProprietario.setEditable(  true  );
          txtProprietario.setFocusable( true  );
          btnExcluir.setVisible(        false );
          btnTransferir.setVisible(     false );
          btnEmplacar.setVisible(       false );
-         placaNova = true;
       }
-
-      placaAnterior = placa;
       btnSalvar.setVisible( true );
       return true;
    }
@@ -264,6 +317,7 @@ public class VEICULO extends JFrame
       public void actionPerformed( ActionEvent event )
       {
          if ( validaEmplacamento( txtEmplacamento.getText() ) ) txtMarca.requestFocus();
+         botãoSalvar = false;
       }
    }
    private class HdlrEmplacamentoFc implements FocusListener
@@ -275,19 +329,22 @@ public class VEICULO extends JFrame
       public void focusLost( FocusEvent event )
       {
 //         if ( validaEmplacamento( txtEmplacamento.getText() ) ) txtMarca.requestFocus();
+//         botãoSalvar = false;
       }
    }
    private boolean validaEmplacamento( String emplacamento )
    {
       if ( emplacamento.length() == 0 ) {
-         JOptionPane.showMessageDialog( VEICULO.this , "Informe a Data do Emplacamento!" ,
-                 "Formato DDMMAAAA" , JOptionPane.WARNING_MESSAGE );
+         JOptionPane.showMessageDialog( VEICULO.this ,
+                 "Informe a Data do Emplacamento!" , "Formato DDMMAAAA" ,
+                 JOptionPane.WARNING_MESSAGE );
          txtEmplacamento.requestFocus();
          return false;
       }
       if ( !DATA.DATAéValida( emplacamento ) ) {
-         JOptionPane.showMessageDialog( VEICULO.this , "Data inválida!" ,
-                 "Formato DDMMAAAA" , JOptionPane.ERROR_MESSAGE );
+         JOptionPane.showMessageDialog( VEICULO.this ,
+                 "Data inválida!" , "Formato DDMMAAAA" ,
+                 JOptionPane.ERROR_MESSAGE );
          txtEmplacamento.requestFocus();
          return false;
       }
@@ -301,6 +358,7 @@ public class VEICULO extends JFrame
       public void actionPerformed( ActionEvent event )
       {
          if ( validaMarca( txtMarca.getText() ) ) txtModelo.requestFocus();
+         botãoSalvar = false;
       }
    }
    private class HdlrMarcaFc implements FocusListener
@@ -312,19 +370,22 @@ public class VEICULO extends JFrame
       public void focusLost( FocusEvent event )
       {
 //         if ( validaMarca( txtMarca.getText() ) ) txtModelo.requestFocus();
+//         botãoSalvar = false;
       }
    }
    private boolean validaMarca( String marca )
    {
       if ( marca.length() == 0 ) {
-         JOptionPane.showMessageDialog( VEICULO.this , "Informe a Marca!" ,
-                 "Até 25 caracteres" , JOptionPane.WARNING_MESSAGE );
+         JOptionPane.showMessageDialog( VEICULO.this ,
+                 "Informe a Marca!" , "Até 25 caracteres" ,
+                 JOptionPane.WARNING_MESSAGE );
          txtMarca.requestFocus();
          return false;
       }
       if ( marca.length() > 25 ) {
-         JOptionPane.showMessageDialog( VEICULO.this , "Marca inválida!" ,
-                 "Até 25 caracteres" , JOptionPane.ERROR_MESSAGE );
+         JOptionPane.showMessageDialog( VEICULO.this ,
+                 "Marca inválida!" , "Até 25 caracteres" ,
+                 JOptionPane.ERROR_MESSAGE );
          txtMarca.requestFocus();
          return false;
       }
@@ -338,6 +399,7 @@ public class VEICULO extends JFrame
       public void actionPerformed( ActionEvent event )
       {
          if ( validaModelo( txtModelo.getText() ) ) txtAno.requestFocus();
+         botãoSalvar = false;
       }
    }
    private class HdlrModeloFc implements FocusListener
@@ -349,13 +411,15 @@ public class VEICULO extends JFrame
       public void focusLost( FocusEvent event )
       {
 //         if ( validaModelo( txtModelo.getText() ) ) txtAno.requestFocus();
+//         botãoSalvar = false;
       }
    }
    private boolean validaModelo( String modelo )
    {
       if ( modelo.length() > 35 ) {
-         JOptionPane.showMessageDialog( VEICULO.this , "Modelo inválido!" ,
-                 "Até 35 caracteres" , JOptionPane.ERROR_MESSAGE );
+         JOptionPane.showMessageDialog( VEICULO.this ,
+                 "Modelo inválido!" , "Até 35 caracteres" ,
+                 JOptionPane.ERROR_MESSAGE );
          txtModelo.requestFocus();
          return false;
       }
@@ -369,6 +433,7 @@ public class VEICULO extends JFrame
       public void actionPerformed( ActionEvent event )
       {
          if ( validaAno( txtAno.getText() ) ) txtCor.requestFocus();
+         botãoSalvar = false;
       }
    }
    private class HdlrAnoFc implements FocusListener
@@ -380,21 +445,24 @@ public class VEICULO extends JFrame
       public void focusLost( FocusEvent event )
       {
 //         if ( validaAno( txtAno.getText() ) ) txtCor.requestFocus();
+//         botãoSalvar = false;
       }
    }
    private boolean validaAno( String ano )
    {
       if ( ano.length() > 4 ) {
-         JOptionPane.showMessageDialog( VEICULO.this , "Ano inválido!" ,
-                 "Até 4 dígitos" , JOptionPane.ERROR_MESSAGE );
+         JOptionPane.showMessageDialog( VEICULO.this ,
+                 "Ano inválido!" , "Até 4 dígitos" ,
+                 JOptionPane.ERROR_MESSAGE );
          txtAno.requestFocus();
          return false;
       }
       byte[] Ano = ano.getBytes();
       for ( byte i = 0; i < Ano.length; i++ )
          if ( Ano[i] < 48 || Ano[i] > 57 ) {
-            JOptionPane.showMessageDialog( VEICULO.this , "Ano inválido!" ,
-                    "Até 4 dígitos" , JOptionPane.ERROR_MESSAGE );
+            JOptionPane.showMessageDialog( VEICULO.this ,
+                    "Ano inválido!" , "Até 4 dígitos" ,
+                    JOptionPane.ERROR_MESSAGE );
             txtAno.requestFocus();
             return false;
          }
@@ -406,9 +474,8 @@ public class VEICULO extends JFrame
       @Override
       public void actionPerformed( ActionEvent event )
       {
-         if ( validaCor( txtCor.getText() ) )
-            if ( placaNova ) txtProprietario.requestFocus();
-            else txtPlaca.requestFocus();
+         if ( validaCor( txtCor.getText() ) ) txtPlaca.requestFocus();
+         botãoSalvar = false;
       }
    }
    private class HdlrCorFc implements FocusListener
@@ -419,16 +486,16 @@ public class VEICULO extends JFrame
       @Override
       public void focusLost( FocusEvent event )
       {
-//         if ( validaCor( txtCor.getText() ) )
-//            if ( placaNova ) txtProprietario.requestFocus();
-//            else txtPlaca.requestFocus();
+//         if ( validaCor( txtCor.getText() ) ) txtPlaca.requestFocus();
+//         botãoSalvar = false;
       }
    }
    private boolean validaCor( String cor )
    {
       if ( cor.length() > 15 ) {
-         JOptionPane.showMessageDialog( VEICULO.this , "Cor inválida!" ,
-                 "Até 15 caracteres" , JOptionPane.ERROR_MESSAGE );
+         JOptionPane.showMessageDialog( VEICULO.this ,
+                 "Cor inválida!" , "Até 15 caracteres" ,
+                 JOptionPane.ERROR_MESSAGE );
          txtCor.requestFocus();
          return false;
       }
@@ -442,6 +509,7 @@ public class VEICULO extends JFrame
       public void actionPerformed( ActionEvent event )
       {
          if ( validaProprietario( txtProprietario.getText() ) ) txtPlaca.requestFocus();
+         botãoSalvar = false;
       }
    }
    private class HdlrProprietarioFc implements FocusListener
@@ -450,24 +518,28 @@ public class VEICULO extends JFrame
       public void focusGained( FocusEvent event )
       {
          txtProprietario.setText( CPF.limpaCPF( txtProprietario.getText() ) );
+         botãoSalvar = false;
       }
       @Override
       public void focusLost( FocusEvent event )
       {
 //         if ( validaProprietario( txtProprietario.getText() ) ) txtPlaca.requestFocus();
+//         botãoSalvar = false;
       }
    }
    private boolean validaProprietario( String proprietario )
    {
       if ( proprietario.length() == 0 ) {
-         JOptionPane.showMessageDialog( VEICULO.this , "Informe o CPF do Proprietário!" ,
-                 "Até 11 dígitos" , JOptionPane.WARNING_MESSAGE );
+         JOptionPane.showMessageDialog( VEICULO.this ,
+                 "Informe o CPF do Proprietário!" , "Até 11 dígitos" ,
+                 JOptionPane.WARNING_MESSAGE );
          txtProprietario.requestFocus();
          return false;
       }
       if ( !CPF.CPFéValido( proprietario ) ) {
-         JOptionPane.showMessageDialog( VEICULO.this , "CPF inválido!" ,
-                 "Até 11 dígitos" , JOptionPane.ERROR_MESSAGE );
+         JOptionPane.showMessageDialog( VEICULO.this ,
+                 "CPF inválido!" , "Até 11 dígitos" ,
+                 JOptionPane.ERROR_MESSAGE );
          txtProprietario.requestFocus();
          return false;
       }
@@ -480,39 +552,88 @@ public class VEICULO extends JFrame
       @Override
       public void actionPerformed( ActionEvent event )
       {
+         botãoSalvar = true;
          String placa = PLACA.limpaPlaca( txtPlaca.getText() );
-         if ( !validaPlaca( placa ) || !placa.equals( placaAnterior ) ) return;
+         if ( !validaPlaca( placa ) ) return;
 
-         PLACA Placa = new PLACA( placa );
+         Placa = new PLACA( placa );
+         String emplacamento = "";
          if ( Placa.getEhMercosul() ) {
-            String emplacamento = txtEmplacamento.getText();
+            emplacamento = txtEmplacamento.getText();
             if ( !validaEmplacamento( emplacamento ) ) return;
          }
 
-         String marca = txtMarca.getText();
-         if ( !validaMarca( marca ) ) return;
+         Marca = txtMarca.getText();
+         if ( !validaMarca( Marca ) ) return;
 
-         String modelo = txtModelo.getText();
-         if ( !validaModelo( modelo ) ) return;
+         Modelo = txtModelo.getText();
+         if ( !validaModelo( Modelo ) ) return;
 
          String ano = txtAno.getText();
          if ( !validaAno( ano ) ) return;
 
-         String cor = txtCor.getText();
-         if ( !validaCor( cor ) ) return;
+         Cor = txtCor.getText();
+         if ( !validaCor( Cor ) ) return;
 
          String proprietario = CPF.limpaCPF( txtProprietario.getText() );
          if ( !validaProprietario( proprietario ) ) return;
 
-//-------------------------------------------------------------
-//       Atualizar o Banco de Dados:
-//         if ( placaNova ) INSERT
-//            placaAnterior = placa;
-//            placaNova     = false;
-//         else UPDATE
-         JOptionPane.showMessageDialog( VEICULO.this , "Salvando Veículo..." ,
-                 "Rotina de Salvamento" , JOptionPane.INFORMATION_MESSAGE );
-//-------------------------------------------------------------
+         final String Url      = "jdbc:mysql://127.0.0.1:3306/detran";
+         final String User     = "root";
+         final String PassWord = "mysql";
+         Connection Conexão = null;
+         Statement  Comando = null;
+
+         placa = Placa.getMercosul();
+         emplacamento = Placa.getEhMercosul() ? DATA.reverteDATA( emplacamento ) : "";
+         Ano = ano.length() == 0 ? 0 : Short.parseShort( ano );
+         long prop = proprietario.length() == 0 ? 0 : Long.parseLong( proprietario );
+         String Sql;
+
+         if ( veiculoNovo )
+            Sql = "INSERT INTO veiculo ( Placa, DTemplacamento, Marca, Modelo, Ano, Cor, Proprietario )"
+                + "VALUES ( '" + placa + "', '" + emplacamento + "', '" + Marca + "', '" + Modelo
+                + "', " + Ano + ", '"  + Cor + "', " + prop + ");";
+         else
+            Sql = "UPDATE veiculo SET DTemplacamento = '" + emplacamento + "', Marca = '" + Marca
+                + "', Modelo = '" + Modelo + "', Ano = " + Ano + ", Cor = '" + Cor + "', Proprietario = "
+                + prop + " WHERE Placa = '" + placa + "';";
+
+         try {
+            Conexão = DriverManager.getConnection( Url , User , PassWord );
+            Comando = Conexão.createStatement();
+            if ( Comando.executeUpdate( Sql ) != 1 ) {
+               JOptionPane.showMessageDialog( VEICULO.this ,
+                       "Número inválido de registros alterados/inseridos!" ,
+                       "Erro de Banco de Dados" , JOptionPane.ERROR_MESSAGE );
+               txtPlaca.requestFocus();
+               return;
+            }
+
+         } catch( Exception erro ) {
+            JOptionPane.showMessageDialog( VEICULO.this ,
+                    erro , "Erro de Banco de Dados" ,
+                    JOptionPane.ERROR_MESSAGE );
+            txtPlaca.requestFocus();
+            return;
+
+         } finally {
+            try {
+               if( Comando != null ) Comando.close();
+               if( Conexão != null ) Conexão.close();
+
+            } catch( Exception erro ) {
+               JOptionPane.showMessageDialog( VEICULO.this ,
+                       erro , "Erro de Banco de Dados" ,
+                       JOptionPane.ERROR_MESSAGE );
+               txtPlaca.requestFocus();
+               return;
+            }
+         }
+         btnSalvar.setVisible(     true );
+         btnExcluir.setVisible(    true );
+         btnTransferir.setVisible( true );
+         btnEmplacar.setVisible( !Placa.getEhMercosul() );
       }
    }
    private class HdlrExcluir implements ActionListener
@@ -520,15 +641,65 @@ public class VEICULO extends JFrame
       @Override
       public void actionPerformed( ActionEvent event )
       {
+         botãoSalvar = true;
          String placa = PLACA.limpaPlaca( txtPlaca.getText() );
-         if ( placaNova || !placa.equals( placaAnterior ) || !validaPlaca( placa ) )
+         if ( veiculoNovo || !validaPlaca( placa ) )
             return;
 
-//-------------------------------------------------------------
-//       Atualizar o Banco de Dados: DELETE
-         JOptionPane.showMessageDialog( VEICULO.this , "Excluindo Veículo..." ,
-                 "Rotina de Exclusão" , JOptionPane.INFORMATION_MESSAGE );
-//-------------------------------------------------------------
+         final String Url      = "jdbc:mysql://127.0.0.1:3306/detran";
+         final String User     = "root";
+         final String PassWord = "mysql";
+         Connection Conexão = null;
+         Statement  Comando = null;
+
+         Placa = new PLACA( placa );
+         placa = Placa.getMercosul();
+         String Sql = "DELETE FROM veiculo WHERE Placa = '" + placa + "';";
+
+         try {
+            Conexão = DriverManager.getConnection( Url , User , PassWord );
+            Comando = Conexão.createStatement();
+            if ( Comando.executeUpdate( Sql ) != 1 ) {
+               JOptionPane.showMessageDialog( VEICULO.this ,
+                       "Número inválido de registros excluídos!" ,
+                       "Erro de Banco de Dados" , JOptionPane.ERROR_MESSAGE );
+               txtPlaca.requestFocus();
+               return;
+            }
+
+         } catch( Exception erro ) {
+            JOptionPane.showMessageDialog( VEICULO.this ,
+                    erro , "Erro de Banco de Dados" ,
+                    JOptionPane.ERROR_MESSAGE );
+            txtPlaca.requestFocus();
+            return;
+
+         } finally {
+            try {
+               if( Comando != null ) Comando.close();
+               if( Conexão != null ) Conexão.close();
+
+            } catch( Exception erro ) {
+               JOptionPane.showMessageDialog( VEICULO.this ,
+                       erro , "Erro de Banco de Dados" ,
+                       JOptionPane.ERROR_MESSAGE );
+               txtPlaca.requestFocus();
+               return;
+            }
+         }
+         txtPlaca.setText(        "" );
+         txtEmplacamento.setText( "" );
+         txtMarca.setText(        "" );
+         txtModelo.setText(       "" );
+         txtAno.setText(          "" );
+         txtCor.setText(          "" );
+         txtProprietario.setText( "" );
+
+         txtPlaca.requestFocus();
+         btnSalvar.setVisible(     false );
+         btnExcluir.setVisible(    false );
+         btnEmplacar.setVisible(   false );
+         btnTransferir.setVisible( false );
       }
    }
    private class HdlrEmplacar implements ActionListener
@@ -536,8 +707,9 @@ public class VEICULO extends JFrame
       @Override
       public void actionPerformed( ActionEvent event )
       {
+         botãoSalvar = true;
          String placa = PLACA.limpaPlaca( txtPlaca.getText() );
-         if ( placaNova || !placa.equals( placaAnterior ) || !validaPlaca( placa ) )
+         if ( !validaPlaca( placa ) )
             return;
 
          EMPLACAMENTO Emplacamento = new EMPLACAMENTO( VEICULO.this , placa );
@@ -552,7 +724,6 @@ public class VEICULO extends JFrame
             DATA emplacamento = new DATA( Emplacamento.getDTretorno() );
             txtEmplacamento.setText( emplacamento.toString() );
             btnEmplacar.setVisible( !plc.getEhMercosul() );
-            placaAnterior = plc.toString();
          }
       }
    }
@@ -561,10 +732,10 @@ public class VEICULO extends JFrame
       @Override
       public void actionPerformed( ActionEvent event )
       {
+         botãoSalvar = true;
          String placa    = PLACA.limpaPlaca( txtPlaca.getText() );
          String vendedor = CPF.limpaCPF( txtProprietario.getText() );
-         if ( placaNova || !placa.equals( placaAnterior ) ||
-                 !validaPlaca( placa ) || !validaProprietario( vendedor ) )
+         if ( !validaPlaca( placa ) || !validaProprietario( vendedor ) )
             return;
 
          TRANSFERENCIA Transferencia = new TRANSFERENCIA( VEICULO.this , placa , vendedor );

@@ -1,11 +1,19 @@
+import javax.swing.*;
+
 public class DATA
 {
-   static private short ano;
-   static private byte  mes;
-   static private byte  dia;
+   static short ano;
+   static byte  mes;
+   static byte  dia;
 
    public DATA( String Data )
    {
+      if ( Data.length() == 0 ) {
+         this.ano = 0;
+         this.mes = 0;
+         this.dia = 0;
+         return;
+      }
       byte[] data = Data.getBytes();
       int[][] tabAux = { { 0 , 0 , 0 } , { 2 , 4 , data.length } };
       int indAux = 0;
@@ -33,6 +41,9 @@ public class DATA
    @Override
    public String toString()
    {
+      if ( this.ano == 0 & this.mes == 0 && this.dia == 0 )
+         return "";
+
       String A = String.format( "%d" , this.ano );
       String M = String.format( "%d" , this.mes );
       String D = String.format( "%d" , this.dia );
@@ -41,6 +52,9 @@ public class DATA
    }
    public static boolean DATAéValida( String Data )
    {
+      if ( Data.length() == 0 )
+         return true;
+
       int[] diasMes = { 0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
       int dia = 0;
       int mes = 0;
@@ -90,5 +104,38 @@ public class DATA
       if ( ano % 4 == 0 ) return true;
 
       return false;
+   }
+   public static String inverteDATA( String DTamd )
+   {
+      if ( DTamd.length() == 0 )
+         return "";
+
+      byte[] data = DTamd.getBytes();
+      for ( byte i = 0; i < data.length; i++ ) data[i] -= 48;
+
+      int dia = data[6] * 10 + data[7];
+      int mes = data[4] * 10 + data[5];
+      int ano = data[0];
+      for ( byte i = 1; i < 4; i++ )
+         ano = ano * 10 + data[i];
+
+      String A = String.format( "%d" , ano );
+      String M = String.format( "%d" , mes );
+      String D = String.format( "%d" , dia );
+
+      return D + "/" + M + "/" + A;
+   }
+   public static String reverteDATA( String DTdma )
+   {
+      if ( DTdma.length() == 0 )
+         return "";
+
+      DATA data = new DATA( DTdma );
+
+      String A = String.format( "%04d" , ano );
+      String M = String.format( "%02d" , mes );
+      String D = String.format( "%02d" , dia );
+
+      return A + M + D;
    }
 }

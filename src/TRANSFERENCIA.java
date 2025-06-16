@@ -4,6 +4,9 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.Statement;
 import javax.swing.JFrame;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
@@ -211,20 +214,81 @@ public class TRANSFERENCIA extends JDialog
          String comprador = CPF.limpaCPF( txtComprador.getText() );
          if ( !validaComprador( comprador ) ) return;
 
-         PLACA Placa = new PLACA( PLACA.limpaPlaca( txtPlaca.getText() ) );
-         DATA DTemplacamento = new DATA( transferencia );
-         CPF Vendedor = new CPF( CPF.limpaCPF( txtVendedor.getText() ) );
-         CPF Comprador = new CPF( comprador );
+         String Plc = PLACA.limpaPlaca( txtPlaca.getText() );
+         byte[] plc = Plc.getBytes();
+         plc[4] += 17;
+         String placa = new String( plc );
+         transferencia = DATA.reverteDATA( transferencia );
+         String vendedor = CPF.limpaCPF( txtVendedor.getText() );
+
+         final String Url      = "jdbc:mysql://127.0.0.1:3306/detran";
+         final String User     = "root";
+         final String PassWord = "mysql";
+
+         Connection Conexão = null;
+         Statement  Comando = null;
+         String Sql = "INSERT INTO transferencia ( Placa , DTtransferencia , Comprador , Vendedor ) VALUES ( '"
+                    + placa + "' , '" + transferencia + "' , " + comprador + " , " + vendedor + " );";
+
+         try {
+            Conexão = DriverManager.getConnection( Url , User , PassWord );
+            Comando = Conexão.createStatement();
+            if ( Comando.executeUpdate( Sql ) != 1 ) {
+               JOptionPane.showMessageDialog( TRANSFERENCIA.this ,
+                       "Número inválido de registros inseridos!" ,
+                       "Erro de Banco de Dados" , JOptionPane.ERROR_MESSAGE );
+               return;
+            }
+
+         } catch( Exception erro ) {
+            JOptionPane.showMessageDialog( TRANSFERENCIA.this ,
+                    erro , "Erro de Banco de Dados" , JOptionPane.ERROR_MESSAGE );
+            return;
+
+         } finally {
+            try {
+               if( Comando != null ) Comando.close();
+               if( Conexão != null ) Conexão.close();
+
+            } catch( Exception erro ) {
+               JOptionPane.showMessageDialog( TRANSFERENCIA.this ,
+                       erro , "Erro de Banco de Dados" , JOptionPane.ERROR_MESSAGE );
+               return;
+            }
+         }
+
+         Sql = "UPDATE veiculo SET Proprietario = " + comprador + " WHERE Placa = '" + placa + "';";
+
+         try {
+            Conexão = DriverManager.getConnection( Url , User , PassWord );
+            Comando = Conexão.createStatement();
+            if ( Comando.executeUpdate( Sql ) != 1 ) {
+               JOptionPane.showMessageDialog( TRANSFERENCIA.this ,
+                       "Número inválido de registros inseridos!" ,
+                       "Erro de Banco de Dados" , JOptionPane.ERROR_MESSAGE );
+               return;
+            }
+
+         } catch( Exception erro ) {
+            JOptionPane.showMessageDialog( TRANSFERENCIA.this ,
+                    erro , "Erro de Banco de Dados" , JOptionPane.ERROR_MESSAGE );
+            return;
+
+         } finally {
+            try {
+               if( Comando != null ) Comando.close();
+               if( Conexão != null ) Conexão.close();
+
+            } catch( Exception erro ) {
+               JOptionPane.showMessageDialog( TRANSFERENCIA.this ,
+                       erro , "Erro de Banco de Dados" , JOptionPane.ERROR_MESSAGE );
+               return;
+            }
+         }
 
          BotãoSalvar = true;
+         CPF Comprador = new CPF( comprador );
          CPFretorno  = Comprador.toString();
-//-------------------------------------------------------------
-//       Atualizar o Banco de Dados: INSERT TRANSFERENCIA
-//                      ( Placa , DTemplacamento , Vendedor , Comprador )
-//                                   UPDATE VEICULO Proprietario = Comprador
-         JOptionPane.showMessageDialog( TRANSFERENCIA.this , "Transferindo Veículo..." ,
-              "Rotina de Transferência" , JOptionPane.INFORMATION_MESSAGE );
-//-------------------------------------------------------------
          dispose();
       }
    }

@@ -1,13 +1,14 @@
 public class PLACA
 {
-   static private String mercosul;
-   static private String antiga;
+   static private String  mercosul;
+   static private String  antiga;
    static private boolean ehMercosul;
 
    public PLACA( String Placa )
    {
       byte[] placa = Placa.getBytes();
       this.ehMercosul = placa[4] > 60;
+
       if ( this.ehMercosul ) {
          this.mercosul = Placa;
          placa[4] -= 17;
